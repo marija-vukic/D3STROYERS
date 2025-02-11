@@ -9,7 +9,7 @@ body {
 }
 
 .line-hr {
-  stroke: "re";
+  stroke: "red";
   stroke-width: 2px;
   fill: none;
 }
