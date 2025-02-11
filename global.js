@@ -40,12 +40,12 @@ Promise.all([
 });
 
 function createVisualization(data, foodLogData) {
-    const width = 1000;
-    const height = 600;
-    const marginTop = 20;
-    const marginRight = 100;
-    const marginBottom = 40;
-    const marginLeft = 60;
+    const width = 1200;  // Increased width
+    const height = 700;  // Increased height
+    const marginTop = 40;
+    const marginRight = 180;  // Increased to fit the legend
+    const marginBottom = 80;  // Increased to fit longer date labels
+    const marginLeft = 80;
 
     // Create time scale (X-axis)
     const x = d3.scaleTime()
@@ -68,14 +68,38 @@ function createVisualization(data, foodLogData) {
         .attr("height", height)
         .style("max-width", "100%");
 
-    // Add X and Y axes
+    // Add vertical rule and move it to the back
+    const rule = svg.append("line")
+        .attr("y1", height - marginBottom)
+        .attr("y2", marginTop)
+        .attr("stroke", "black")
+        .style("opacity", 0)
+        .lower();  // Move the rule to the back
+
+    // Add X-axis and formatted date labels
     svg.append("g")
         .attr("transform", `translate(0,${height - marginBottom})`)
-        .call(d3.axisBottom(x));
+        .call(d3.axisBottom(x).tickFormat(d3.timeFormat("%b %d, %Y %H:%M")));  // Full date with time
 
+    svg.append("text")
+        .attr("x", width / 2)
+        .attr("y", height - 20)
+        .attr("text-anchor", "middle")
+        .attr("class", "axis-label")
+        .text("Time");
+
+    // Add Y-axis and label
     svg.append("g")
         .attr("transform", `translate(${marginLeft},0)`)
         .call(d3.axisLeft(y));
+
+    svg.append("text")
+        .attr("x", -height / 2)
+        .attr("y", 20)
+        .attr("text-anchor", "middle")
+        .attr("transform", "rotate(-90)")
+        .attr("class", "axis-label")
+        .text("Value (Glucose/Heart Rate)");
 
     // Add a group for the lines
     const linesGroup = svg.append("g");
@@ -91,24 +115,46 @@ function createVisualization(data, foodLogData) {
             .attr("class", `line-${key}`)
             .attr("fill", "none")
             .attr("stroke", color(key))
-            .attr("stroke-width", 1.5)
+            .attr("stroke-width", 2)
             .attr("d", d3.line()
                 .x(d => x(d.timestamp))
                 .y(d => y(d.value))
             );
     });
 
-    // Add food markers
-    svg.selectAll(".meal-marker")
+    // Add line legend
+    const legend = svg.append("g")
+        .attr("transform", `translate(${width - marginRight + 20}, ${marginTop})`);
+
+    ["glucose", "hr"].forEach((key, i) => {
+        const legendRow = legend.append("g")
+            .attr("transform", `translate(0, ${i * 25})`);
+
+        legendRow.append("rect")
+            .attr("width", 14)
+            .attr("height", 14)
+            .attr("fill", color(key));
+
+        legendRow.append("text")
+            .attr("x", 20)
+            .attr("y", 12)
+            .attr("class", "legend-text")
+            .text(key === "glucose" ? "Glucose Level (mg/dL)" : "Heart Rate (BPM)");
+    });
+
+    // Add food markers in their own group to bring them to the front
+    const markersGroup = svg.append("g").attr("class", "markers-group");
+
+    markersGroup.selectAll(".meal-marker")
         .data(foodLogData)
         .enter()
         .append("circle")
         .attr("class", "meal-marker")
         .attr("cx", d => x(d.timestamp))
-        .attr("cy", marginTop)
-        .attr("r", 5)
-        .style("fill", "orange")
-        .style("cursor", "pointer")
+        .attr("cy", marginBottom - 10)
+        .attr("r", 6)
+        .style("cursor", "pointer")  // Change cursor to pointer
+        .style("pointer-events", "visible")  // Ensure pointer events are enabled
         .on("click", (event, d) => {
             tooltip.transition().duration(200).style("opacity", 1);
             tooltip.html(`
@@ -126,16 +172,11 @@ function createVisualization(data, foodLogData) {
         .attr("class", "tooltip")
         .style("opacity", 0);
 
-    // Add vertical rule for mouse interaction
-    const rule = svg.append("line")
-        .attr("y1", height - marginBottom)
-        .attr("y2", marginTop)
-        .attr("stroke", "black")
-        .style("opacity", 0);
+    let currentXScale = x;
 
     svg.on("mousemove touchmove", function(event) {
         const [mouseX] = d3.pointer(event, this);
-        const date = x.invert(mouseX);
+        const date = currentXScale.invert(mouseX);
         const closest = data.reduce((a, b) => 
             Math.abs(b.timestamp - date) < Math.abs(a.timestamp - date) ? b : a
         );
@@ -150,7 +191,7 @@ function createVisualization(data, foodLogData) {
         .style("left", `${event.pageX + 10}px`)
         .style("top", `${event.pageY - 30}px`);
 
-        rule.attr("transform", `translate(${x(closest.timestamp)},0)`).style("opacity", 1);
+        rule.attr("transform", `translate(${currentXScale(closest.timestamp)},0)`).style("opacity", 1);
     }).on("mouseout", () => {
         tooltip.transition().duration(200).style("opacity", 0);
         rule.style("opacity", 0);
@@ -161,22 +202,19 @@ function createVisualization(data, foodLogData) {
         .scaleExtent([1, 10])
         .translateExtent([[0, 0], [width, height]])
         .on("zoom", (event) => {
-            const newX = event.transform.rescaleX(x);
+            currentXScale = event.transform.rescaleX(x);
 
             // Update the X-axis with the new scale
-            svg.select("g").call(d3.axisBottom(newX));
+            svg.select("g").call(d3.axisBottom(currentXScale).tickFormat(d3.timeFormat("%b %d, %Y %H:%M")));
 
-            // Update the lines with the new X scale
+            // Update the lines and markers with the new X scale
             linesGroup.selectAll("path")
                 .attr("d", d3.line()
-                    .x(d => newX(d.timestamp))
+                    .x(d => currentXScale(d.timestamp))
                     .y(d => y(d.value)));
-
-            // Update the food markers to match the zoom
-            svg.selectAll(".meal-marker")
-                .attr("cx", d => newX(d.timestamp));
+            markersGroup.selectAll(".meal-marker")
+                .attr("cx", d => currentXScale(d.timestamp));
         });
 
-    // Apply zoom behavior to the SVG
     svg.call(zoom);
 }

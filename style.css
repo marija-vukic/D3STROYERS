@@ -1,39 +1,41 @@
 body {
-    /* Set line height to 1.5 times the font size
-         and use the OS’s UI font as the website font
-       */
-    font: 100%/1.5 system-ui;
-  }
-  .line-glucose {
-    stroke: steelblue;
-    stroke-width: 2px;
-    fill: none;
-  }
-  
-  .line-hr {
-    stroke: red;
-    stroke-width: 2px;
-    fill: none;
-  }
-  
-  .line-eda {
-    stroke: green;
-    stroke-width: 2px;
-    fill: none;
-  }
-  
-  .meal-marker {
-    fill: orange;
-    stroke: black;
-    stroke-width: 1px;
-  }
-  
-  .tooltip {
-    position: absolute;
-    background-color: white;
-    border: 1px solid #ccc;
-    padding: 5px;
-    font-size: 12px;
-    pointer-events: none;
-  }
-  
+  font: 100%/1.5 system-ui;
+}
+
+.line-glucose {
+  stroke: "steelblue";
+  stroke-width: 2px;
+  fill: none;
+}
+
+.line-hr {
+  stroke: "red";
+  stroke-width: 2px;
+  fill: none;
+}
+
+.meal-marker {
+  fill: orange;
+  stroke: black;
+  stroke-width: 1px;
+}
+
+.tooltip {
+  position: absolute;
+  background-color: white;
+  border: 1px solid #ccc;
+  padding: 5px;
+  font-size: 12px;
+  pointer-events: none;
+}
+
+.axis-label {
+  font-size: 14px;
+  font-weight: bold;
+}
+
+.legend-text {
+  font-size: 12px;
+  font-weight: bold;
+  dominant-baseline: middle;
+}
