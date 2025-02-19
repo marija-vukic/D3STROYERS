@@ -34,6 +34,16 @@ function renderCalendar() {
         .domain([0, d3.max(dailyCaloriePercentCarbs, d => d.total)])
         .range([height - margin.bottom, margin.top]);
 
+    // Add Title
+    svgCalendar.append("text")
+    .attr("x", width / 2) // Centered horizontally
+    .attr("y", margin.top - 20) // Positioned above the graph
+    .attr("text-anchor", "middle")
+    .attr("font-size", "22px")
+    .attr("font-weight", "bold")
+    .attr("fill", "#333")
+    .text("Daily Caloric Intake Breakdown: Tracking Total and Carb-Derived Calories");
+
     // Add X-axis (Days)
     svgCalendar.append("g")
         .attr("transform", `translate(0,${height - margin.bottom})`)
@@ -71,7 +81,7 @@ function renderCalendar() {
         .attr("fill", "#333")
         .text("Calories");
 
-    // 🔵 Main Calorie Intake (Stacked Above Sugar)
+    // Main Calorie Intake (Stacked Above Sugar)
     svgCalendar.selectAll(".calorie-bar")
         .data(dailyCaloriePercentCarbs)
         .enter().append("rect")
@@ -79,10 +89,10 @@ function renderCalendar() {
         .attr("x", d => xCalendar(d.day))
         .attr("y", d => yCalendar(d.total))
         .attr("width", xCalendar.bandwidth())
-        .attr("height", d => isNaN(d.total) ? 0 : height - margin.bottom - yCalendar(d.total))  // ✅ Prevent NaN
+        .attr("height", d => isNaN(d.total) ? 0 : height - margin.bottom - yCalendar(d.total))
         .attr("fill", "rgba(50, 110, 160, 0.5)");  // Calories (Blue)
 
-    // 🔴 Sugar Calories (Now at the Bottom)
+    // Sugar Calories (Now at the Bottom)
     svgCalendar.selectAll(".carb-bar")
         .data(dailyCaloriePercentCarbs)
         .enter().append("rect")
@@ -122,6 +132,51 @@ function renderCalendar() {
         })
         .on("click", (event, d) => showMealScatterPlot(d.day));
 
+    // Add Legend Container
+    const legend = svgCalendar.append("g")
+    .attr("transform", `translate(${width - 250}, ${margin.top - 30})`); // Position legend
+
+    // Add legend background
+    legend.append("rect")
+    .attr("width", 180)
+    .attr("height", 60)
+    .attr("fill", "white")
+    .attr("stroke", "#333")
+    .attr("stroke-width", 1.5)
+    .attr("rx", 5) // Rounded corners
+    .attr("ry", 5);
+
+    // Total Calories Legend (Blue)
+    legend.append("rect")
+    .attr("x", 10)
+    .attr("y", 10)
+    .attr("width", 20)
+    .attr("height", 20)
+    .attr("fill", "rgba(50, 110, 160, 0.5)");
+
+    legend.append("text")
+    .attr("x", 40)
+    .attr("y", 25)
+    .attr("font-size", "14px")
+    .attr("fill", "#333")
+    .text("Total Calories");
+
+    // Carb Calories Legend (Red)
+    legend.append("rect")
+    .attr("x", 10)
+    .attr("y", 35)
+    .attr("width", 20)
+    .attr("height", 20)
+    .attr("fill", "rgba(220, 20, 60, 0.6)");
+
+    legend.append("text")
+    .attr("x", 40)
+    .attr("y", 50)
+    .attr("font-size", "14px")
+    .attr("fill", "#333")
+    .text("Carb-Derived Calories");
+
+
 }
 
 
@@ -151,7 +206,7 @@ Promise.all([
     });
 
     
-    // 📈 Process Glucose Data (Dexcom)
+    // Process Glucose Data (Dexcom)
     glucoseData = loadedGlucoseData;
     console.log("✅ Loaded Glucose Data:", glucoseData);
     glucoseData.forEach(d => {
@@ -161,7 +216,7 @@ Promise.all([
         d.level = +d["Glucose Value (mg/dL)"]; // Assuming column name is "glucose_level"
     });
 
-    // ❤️ Process Heart Rate Data (HR)
+    // Process Heart Rate Data (HR)
     heartRateData = loadedHRData;
     heartRateData.forEach(d => {
         d.timestamp = new Date(d["datetime"]);
@@ -181,7 +236,7 @@ Promise.all([
         ([day, total]) => ({ day, total })
     );
     
-    // ✅ Merge into one dataset with carb percentage
+    // Merge into one dataset with carb percentage
     dailyCaloriePercentCarbs = dailyCalories.map(d => {
         let carbEntry = dailyCarbCalories.find(c => c.day === d.day);
         let carbCalories = carbEntry ? carbEntry.total : 0;
@@ -214,14 +269,16 @@ function createBackButton(text, callback) {
         .on("click", callback);
 }
 
-// 📌 Show Meal Scatterplot (Updates Back Button to "Back to Calendar")
+// Show Meal Scatterplot (Updates Back Button to "Back to Calendar")
 function showMealScatterPlot(selectedDay) {
     currentView = "meal";  // Update view state
     d3.select(".tooltip").style("opacity", 0);
     d3.selectAll("svg, .back-button").remove();
+    d3.select(".nutrition-table").remove();
 
     createBackButton("Back to Calendar", () => {
         d3.selectAll("svg, .back-button").remove();
+        d3.select(".nutrition-table").remove();
         renderCalendar();
     });
 
@@ -315,7 +372,7 @@ function showMealScatterPlot(selectedDay) {
             tooltip.transition().duration(200).style("opacity", 0);
         })
         .on("click", function(event, d) {
-            showFocusedGlucoseGraph(d.day, d.time, d.food); // ⬅️ SWITCH TO GLUCOSE GRAPH
+            showFocusedGlucoseGraph(d.day, d.time, d.food); 
         });
 
     // Append legend group
@@ -352,10 +409,13 @@ function showMealScatterPlot(selectedDay) {
 
 }
 
-// 📌 Show Focused Glucose Graph (with Brushing)
+// Show Focused Glucose Graph (with Brushing)
 function showFocusedGlucoseGraph(selectedDay, mealTime, mealName) {
     d3.select(".tooltip").style("opacity", 0);
-    d3.selectAll("svg, .back-button, .legend-container, .brush-info").remove();  // 🔴 Remove previous elements
+    d3.selectAll("svg, .back-button, .legend-container, .brush-info").remove();  
+    d3.select(".graph-container").remove();
+    d3.select(".nutrition-table").remove();
+
 
     // Convert meal time to Date object
     const mealTimestamp = new Date(`${selectedDay} ${mealTime}`);
@@ -451,8 +511,6 @@ function showFocusedGlucoseGraph(selectedDay, mealTime, mealName) {
             tooltip.transition().duration(200).style("opacity", 0);
         });
 
-    // 🔵 Add meal time marker (dashed line)
-    // 🔵 Meal Time Marker (Dashed Line)
     const mealLine = svgGlucose.append("line")
         .attr("x1", xGlucose(mealTimestamp))
         .attr("x2", xGlucose(mealTimestamp))
@@ -462,7 +520,7 @@ function showFocusedGlucoseGraph(selectedDay, mealTime, mealName) {
         .attr("stroke-width", 2)
         .attr("stroke-dasharray", "5,5");
 
-    // ✅ Make an invisible overlay for easy hover interaction
+    // Make an invisible overlay for easy hover interaction
     svgGlucose.append("rect")
         .attr("x", xGlucose(mealTimestamp) - 5) // Expand hitbox slightly
         .attr("y", margin.top)
@@ -480,8 +538,6 @@ function showFocusedGlucoseGraph(selectedDay, mealTime, mealName) {
             tooltip.transition().duration(200).style("opacity", 0);
         });
 
-
-    // ✅ Brushing for interactive selection
     const brush = d3.brushX()
         .extent([[margin.left, margin.top], [width - margin.right, height - margin.bottom]])
         .on("brush end", brushMoved);
@@ -493,7 +549,7 @@ function showFocusedGlucoseGraph(selectedDay, mealTime, mealName) {
 
     function brushMoved({ selection }) {
         if (!selection) {
-            resetBrush();  // 🔴 Ensure brush is fully reset
+            resetBrush(); 
             return;
         }
     
@@ -549,10 +605,7 @@ function showFocusedGlucoseGraph(selectedDay, mealTime, mealName) {
     }
     
 
-    // // 📌 Display Brushing Info (Now dynamically removed)
-    d3.select(".legend-container").remove();  // 🔴 Remove previous legend
-
-    // ✅ Add a properly formatted legend inside the graph
+    d3.select(".legend-container").remove(); 
     const legend = svgGlucose.append("g")
         .attr("class", "legend")
         .attr("transform", `translate(${width - 180}, 40)`); // Adjust position
@@ -603,18 +656,67 @@ function showFocusedGlucoseGraph(selectedDay, mealTime, mealName) {
         .text("Meal Time");
 
     createBackButton("Back to Meal", () => {
-        d3.selectAll("svg, .back-button, .legend-container, .brush-info").remove();  // 🔴 Remove brush info too
+        d3.selectAll("svg, .back-button, .legend-container, .brush-info").remove(); 
         showMealScatterPlot(selectedDay);
     });
 
-    // ✅ Ensure table remains properly positioned
+    // Ensure table remains properly positioned
     d3.select(".graph-container")
         .style("display", "flex")
         .style("justify-content", "space-between");
 
-        
-}
+    const container = d3.select("body")
+        .append("div")
+        .attr("class", "graph-container")
+        .style("display", "flex")  // Ensures side-by-side layout
+        .style("align-items", "flex-start")  // Align both elements at the top
+        .style("gap", "10px")  // Space between graph and table
+        .style("margin", "20px"); // Adjust margins for spacing
 
+    // Append a div for the glucose graph inside the container
+    const graphDiv = container.append("div")
+        .attr("class", "graph-div")
+        .style("flex-grow", "1")  // Allow graph to take remaining space
+        .style("min-width", "700px");  // Ensure a reasonable width
+
+    graphDiv.node().appendChild(svgGlucose.node());
+
+    // Fetch meal data
+    const mealData = foodLogData.find(d => d.day === selectedDay && d.time === mealTime);
+
+    const table = container.append("div")
+        .attr("class", "nutrition-table")
+        .style("padding", "15px")
+        .style("border", "1px solid #ddd")
+        .style("border-radius", "8px")
+        .style("background", "white")
+        .style("box-shadow", "2px 2px 5px rgba(0, 0, 0, 0.2)")
+        .style("min-width", "100px")  // Set a proper fixed width
+        .style("font-family", "Arial, sans-serif");
+
+    table.append("h3").text("Nutrition Facts").style("text-align", "center");
+
+    const nutrients = [
+        { label: "Meal", value: mealData ? mealData.food : "Unknown" },
+        { label: "Calories", value: mealData ? `${mealData.calorie} kcal` : "N/A" },
+        { label: "Carbs", value: mealData ? `${mealData.carbs} g` : "N/A" },
+        { label: "Fiber", value: mealData ? `${mealData.fiber} g` : "N/A" },
+        { label: "Sugar", value: mealData ? `${mealData.sugar} g` : "N/A" },
+        { label: "Protein", value: mealData ? `${mealData.protein} g` : "N/A" },
+        { label: "Fat", value: mealData ? `${mealData.total_fat} g` : "N/A" }
+    ];
+
+    nutrients.forEach(nutrient => {
+        const row = table.append("div")
+            .style("display", "flex")
+            .style("justify-content", "space-between")
+            .style("border-bottom", "1px solid #ddd")
+            .style("padding", "8px 0");
+
+        row.append("span").text(nutrient.label).style("font-weight", "bold");
+        row.append("span").text(nutrient.value);
+    });
+}
 
 function findNearestGlucose(mealTime, glucoseData) {
     return glucoseData.reduce((closest, current) => {
