@@ -1,7 +1,7 @@
 // Global dimensions
-const width = 1000;
+const width = 1200;
 const height = 600;
-const margin = { top: 50, right: 100, bottom: 120, left: 100 };
+const margin = { top: 50, right: 225, bottom: 150, left: 100 };
 
 let xCalendar, yCalendar, dailyCalories, foodLogData;
 
@@ -44,6 +44,16 @@ function renderCalendar() {
     .attr("fill", "#333")
     .text("Daily Caloric Intake Breakdown: Tracking Total and Carb-Derived Calories");
 
+    // Add Paragraph Description Below the Bar Chart
+    svgCalendar.append("text")
+        .attr("x", width / 2) // Center the text below the graph
+        .attr("y", height - margin.bottom + 90) // Position below X-axis
+        .attr("text-anchor", "middle")
+        .attr("font-size", "16px")
+        .attr("fill", "#555")
+        .text("Click on a day to explore the meals consumed and see their impact on glucose levels.");
+
+
     // Add X-axis (Days)
     svgCalendar.append("g")
         .attr("transform", `translate(0,${height - margin.bottom})`)
@@ -57,7 +67,7 @@ function renderCalendar() {
     svgCalendar.append("text")
         .attr("class", "axis-label")
         .attr("x", width / 2)
-        .attr("y", height - margin.bottom + 90) // Position below axis
+        .attr("y", height - margin.bottom + 45) // Position below axis
         .attr("text-anchor", "middle")
         .attr("font-size", "16px")
         .attr("fill", "#333")
@@ -132,19 +142,20 @@ function renderCalendar() {
         })
         .on("click", (event, d) => showMealScatterPlot(d.day));
 
-    // Add Legend Container
+    // Adjust Legend Position to the Far Right (Beside the Graph)
     const legend = svgCalendar.append("g")
-    .attr("transform", `translate(${width - 250}, ${margin.top - 30})`); // Position legend
+    .attr("transform", `translate(${width - margin.right + 20}, ${margin.top})`); // Move to the right outside the graph
 
     // Add legend background
     legend.append("rect")
-    .attr("width", 180)
+    .attr("width", 200)
     .attr("height", 60)
     .attr("fill", "white")
     .attr("stroke", "#333")
     .attr("stroke-width", 1.5)
     .attr("rx", 5) // Rounded corners
-    .attr("ry", 5);
+    .attr("ry", 5)
+    .attr("opacity", 0.9); // Slight transparency for better visibility
 
     // Total Calories Legend (Blue)
     legend.append("rect")
@@ -175,7 +186,6 @@ function renderCalendar() {
     .attr("font-size", "14px")
     .attr("fill", "#333")
     .text("Carb-Derived Calories");
-
 
 }
 
@@ -270,7 +280,7 @@ function createBackButton(text, callback) {
 }
 
 // Show Meal Scatterplot (Updates Back Button to "Back to Calendar")
-function showMealScatterPlot(selectedDay) {
+function showMealScatterPlot(selectedDay, mealName) {
     currentView = "meal";  // Update view state
     d3.select(".tooltip").style("opacity", 0);
     d3.selectAll("svg, .back-button").remove();
@@ -303,6 +313,25 @@ function showMealScatterPlot(selectedDay) {
     const svgScatter = d3.select("body").append("svg")
         .attr("width", width)
         .attr("height", height);
+
+    // Add Title
+    svgScatter.append("text")
+        .attr("x", width / 2) // Centered horizontally
+        .attr("y", margin.top - 20) // Positioned above the graph
+        .attr("text-anchor", "middle")
+        .attr("font-size", "22px")
+        .attr("font-weight", "bold")
+        .attr("fill", "#333")
+        .text("Meal Calorie Intensity Throughout the Day");
+
+    // Add Paragraph Description Below the Graph
+    svgScatter.append("text")
+        .attr("x", width / 2) // Centered
+        .attr("y", height - margin.bottom + 75) // Positioned below the X-axis
+        .attr("text-anchor", "middle")
+        .attr("font-size", "16px")
+        .attr("fill", "#555")
+        .text("Click on a meal to explore its nutritional details and see how it impacts glucose levels.");
 
     // x axis
     svgScatter.append("g")
@@ -416,7 +445,6 @@ function showFocusedGlucoseGraph(selectedDay, mealTime, mealName) {
     d3.select(".graph-container").remove();
     d3.select(".nutrition-table").remove();
 
-
     // Convert meal time to Date object
     const mealTimestamp = new Date(`${selectedDay} ${mealTime}`);
     const oneHourBefore = new Date(mealTimestamp.getTime() - 60 * 60 * 1000);
@@ -444,6 +472,40 @@ function showFocusedGlucoseGraph(selectedDay, mealTime, mealName) {
         .attr("width", width)
         .attr("height", height);
 
+    // Add Title
+    svgGlucose.append("text")
+        .attr("x", width / 2) // Centered horizontally
+        .attr("y", margin.top - 20) // Positioned above the graph
+        .attr("text-anchor", "middle")
+        .attr("font-size", "22px")
+        .attr("font-weight", "bold")
+        .attr("fill", "#333")
+        .text("Tracking Glucose Response: The Impact of " + mealName + " on Blood Sugar");
+
+    // Add Paragraph Description Below the Bar Chart with Multi-Line Support
+    const description = [
+        "This graph shows how blood sugar levels change before and after consuming a specific meal. The dashed blue line marks the time of consumption",
+        "helping you see how quickly glucose levels rise and return to baseline. A sharp increase may indicate a strong glycemic response, while a",
+        "steady curve suggests a more gradual impact. Use this visualization to compare different meals and understand which",
+        " foods cause the biggest spikes in blood sugar."
+    ];
+
+    const textElement = svgGlucose.append("text")
+        .attr("x", width / 2) // Center text
+        .attr("y", height - margin.bottom + 90) // Position below X-axis
+        .attr("text-anchor", "middle")
+        .attr("font-size", "16px")
+        .attr("fill", "#555");
+
+    // Append each line of text separately
+    description.forEach((line, i) => {
+        textElement.append("tspan")
+            .attr("x", width / 2)
+            .attr("dy", i === 0 ? "0" : "1.2em") // Space between lines
+            .text(line);
+    });
+
+    
     // Add axes
     //  x axis
     svgGlucose.append("g")
