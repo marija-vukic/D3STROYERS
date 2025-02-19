@@ -26,12 +26,12 @@ function renderCalendar() {
         .attr("height", height);
 
     xCalendar = d3.scaleBand()
-        .domain(dailyCaloriePercentSugar.map(d => d.day))
+        .domain(dailyCaloriePercentCarbs.map(d => d.day))
         .range([margin.left, width - margin.right])
         .padding(0.2);
 
     yCalendar = d3.scaleLinear()
-        .domain([0, d3.max(dailyCaloriePercentSugar, d => d.total)])
+        .domain([0, d3.max(dailyCaloriePercentCarbs, d => d.total)])
         .range([height - margin.bottom, margin.top]);
 
     // Add X-axis (Days)
@@ -43,6 +43,16 @@ function renderCalendar() {
         .attr("transform", "rotate(-45)")
         .attr("font-size", "14px");
 
+    // Add X-axis Label (Date)
+    svgCalendar.append("text")
+        .attr("class", "axis-label")
+        .attr("x", width / 2)
+        .attr("y", height - margin.bottom + 90) // Position below axis
+        .attr("text-anchor", "middle")
+        .attr("font-size", "16px")
+        .attr("fill", "#333")
+        .text("Date");
+
     // Add Y-axis (Calories)
     svgCalendar.append("g")
         .attr("transform", `translate(${margin.left},0)`)
@@ -50,31 +60,42 @@ function renderCalendar() {
         .selectAll("text")
         .attr("font-size", "14px");
 
-    // 🔴 Sugar Calories (Now at the Bottom)
-    svgCalendar.selectAll(".sugar-bar")
-        .data(dailyCaloriePercentSugar)
-        .enter().append("rect")
-        .attr("class", "sugar-bar")
-        .attr("x", d => xCalendar(d.day))
-        .attr("y", d => yCalendar(d.sugarCalories))  // Sugar now at the base
-        .attr("width", xCalendar.bandwidth())
-        .attr("height", d => height - margin.bottom - yCalendar(d.sugarCalories))
-        .attr("fill", "rgba(220, 20, 60, 0.5)");  // Crimson color for sugar
+    // Add Y-axis Label (Calories)
+    svgCalendar.append("text")
+        .attr("class", "axis-label")
+        .attr("transform", "rotate(-90)") // Rotate for Y-axis
+        .attr("x", -height / 2)
+        .attr("y", margin.left - 60) // Position left of axis
+        .attr("text-anchor", "middle")
+        .attr("font-size", "16px")
+        .attr("fill", "#333")
+        .text("Calories");
 
     // 🔵 Main Calorie Intake (Stacked Above Sugar)
     svgCalendar.selectAll(".calorie-bar")
-        .data(dailyCaloriePercentSugar)
+        .data(dailyCaloriePercentCarbs)
         .enter().append("rect")
         .attr("class", "calorie-bar")
         .attr("x", d => xCalendar(d.day))
         .attr("y", d => yCalendar(d.total))
         .attr("width", xCalendar.bandwidth())
-        .attr("height", d => height - margin.bottom - yCalendar(d.total - d.sugarCalories))
+        .attr("height", d => isNaN(d.total) ? 0 : height - margin.bottom - yCalendar(d.total))  // ✅ Prevent NaN
         .attr("fill", "rgba(50, 110, 160, 0.5)");  // Calories (Blue)
+
+    // 🔴 Sugar Calories (Now at the Bottom)
+    svgCalendar.selectAll(".carb-bar")
+        .data(dailyCaloriePercentCarbs)
+        .enter().append("rect")
+        .attr("class", "carb-bar")
+        .attr("x", d => xCalendar(d.day))
+        .attr("y", d => yCalendar(d.carbCalories))  // Sugar now at the base
+        .attr("width", xCalendar.bandwidth())
+        .attr("height", d => height - margin.bottom - yCalendar(d.carbCalories))
+        .attr("fill", "rgba(220, 20, 60, 0.6)");  // Crimson color for sugar
 
     // Transparent Interactive Overlay
     svgCalendar.selectAll(".bar-overlay")
-        .data(dailyCaloriePercentSugar)
+        .data(dailyCaloriePercentCarbs)
         .enter().append("rect")
         .attr("class", "bar-overlay")
         .attr("x", d => xCalendar(d.day))
@@ -88,9 +109,9 @@ function renderCalendar() {
 
             tooltip.transition().duration(200).style("opacity", 1);
             tooltip.html(`
-                <strong>Day:</strong> ${d.day} <br>
+                <strong>Date:</strong> ${d.day} <br>
                 <strong>Total Calories:</strong> ${d.total} kcal<br>
-                <strong>Sugar Calories:</strong> ${d.sugarCalories} kcal (${d.sugarPercent.toFixed(1)}%)
+                <strong>Carb Calories:</strong> ${d.carbCalories} kcal (${d.carbPercent.toFixed(1)}%)
             `)
             .style("left", `${event.pageX + 10}px`)
             .style("top", `${event.pageY - 30}px`);
@@ -119,9 +140,11 @@ Promise.all([
         d.calorie = +d["calorie"];
         d.sugar = +d["sugar"] || 0;
         d.sugarCalories = d.sugar * 4;
-        d.total_carb = +d["total_carb"] || 0; // ✅ Store total carbs
+        d.carbs = +d["total_carb"] || 0; // ✅ Store total carbs
+        d.carbCalories = d.carbs * 4;  // ✅ Calculate carb calories
     });
 
+    
     // 📈 Process Glucose Data (Dexcom)
     glucoseData = loadedGlucoseData;
     console.log("✅ Loaded Glucose Data:", glucoseData);
@@ -146,18 +169,18 @@ Promise.all([
         d3.rollup(foodLogData, v => d3.sum(v, d => d.calorie), d => d.day),
         ([day, total]) => ({ day, total })
     );
-
-    dailySugarCalories = Array.from(
-        d3.rollup(foodLogData, v => d3.sum(v, d => d.sugarCalories), d => d.day),
+    
+    dailyCarbCalories = Array.from(
+        d3.rollup(foodLogData, v => d3.sum(v, d => d.carbCalories), d => d.day),
         ([day, total]) => ({ day, total })
     );
-
-    // Merge into one dataset with sugar percentage
-    dailyCaloriePercentSugar = dailyCalories.map(d => {
-        let sugarEntry = dailySugarCalories.find(s => s.day === d.day);
-        let sugarCalories = sugarEntry ? sugarEntry.total : 0;
-        let sugarPercent = (sugarCalories / d.total) * 100;
-        return { day: d.day, total: d.total, sugarCalories, sugarPercent };
+    
+    // ✅ Merge into one dataset with carb percentage
+    dailyCaloriePercentCarbs = dailyCalories.map(d => {
+        let carbEntry = dailyCarbCalories.find(c => c.day === d.day);
+        let carbCalories = carbEntry ? carbEntry.total : 0;
+        let carbPercent = (carbCalories / d.total) * 100;
+        return { day: d.day, total: d.total, carbCalories, carbPercent };
     });
 
     renderCalendar(); // Now pass the processed data
@@ -198,13 +221,16 @@ function showMealScatterPlot(selectedDay) {
 
     const filteredFoodData = foodLogData.filter(d => d.day === selectedDay);
 
+    // Ensure enough margin for y-axis meal labels
+    const updatedMargin = { ...margin, left: 160 };
+    
     const xScatter = d3.scaleTime()
         .domain([new Date("2000-01-01 00:00"), new Date("2000-01-01 23:59")])
-        .range([margin.left, width - margin.right]);
+        .range([updatedMargin.left, width - updatedMargin.right]);
 
     const yFood = d3.scaleBand()
         .domain([...new Set(filteredFoodData.map(d => d.food))])
-        .range([height - margin.bottom, margin.top])
+        .range([updatedMargin.top, height - updatedMargin.bottom])
         .padding(0.2);
 
     const rScale = d3.scaleSqrt()
@@ -215,13 +241,36 @@ function showMealScatterPlot(selectedDay) {
         .attr("width", width)
         .attr("height", height);
 
+    // x axis
     svgScatter.append("g")
         .attr("transform", `translate(0,${height - margin.bottom})`)
         .call(d3.axisBottom(xScatter).tickFormat(d3.timeFormat("%H:%M")));
 
+    // Add X-axis Label
+    svgScatter.append("text")
+        .attr("class", "axis-label")
+        .attr("x", width / 2)
+        .attr("y", height - updatedMargin.bottom + 40) // Position below axis
+        .attr("text-anchor", "middle")
+        .attr("font-size", "16px")
+        .attr("fill", "#333")
+        .text("Time");
+
+    // y axis
     svgScatter.append("g")
-        .attr("transform", `translate(${margin.left},0)`)
+        .attr("transform", `translate(${updatedMargin.left},0)`)
         .call(d3.axisLeft(yFood));
+        
+    // Add Y-axis Label 
+    svgScatter.append("text")
+        .attr("class", "axis-label")
+        .attr("transform", "rotate(-90)") // Rotate for Y-axis
+        .attr("x", -height / 2)
+        .attr("y", updatedMargin.left - 120) // Position left of axis
+        .attr("text-anchor", "middle")
+        .attr("font-size", "16px")
+        .attr("fill", "#333")
+        .text("Meals");
 
     svgScatter.selectAll(".meal-circle")
         .data(filteredFoodData)
@@ -243,8 +292,8 @@ function showMealScatterPlot(selectedDay) {
             tooltip.html(`
                 <strong>Meal:</strong> ${d.food}<br>
                 <strong>Calories:</strong> ${d.calorie} kcal<br>
-                <strong>Carbs:</strong> ${d.total_carb.toFixed(1)}g<br>
-                <strong>Sugar:</strong> ${d.sugar.toFixed(1)}g<br>
+                <strong>Carb Calories:</strong> ${d.carbCalories.toFixed(1)} kcal<br>
+                <strong>Sugar Calories:</strong> ${d.sugarCalories.toFixed(1)} g<br>
                 <strong>Time:</strong> ${d.time}
             `)
             .style("left", `${event.pageX + 10}px`)
@@ -262,6 +311,39 @@ function showMealScatterPlot(selectedDay) {
         .on("click", function(event, d) {
             showFocusedGlucoseGraph(d.day, d.time, d.food); // ⬅️ SWITCH TO GLUCOSE GRAPH
         });
+
+    // Append legend group
+    const legend = svgScatter.append("g")
+    .attr("class", "legend")
+    .attr("transform", `translate(${width - 180}, 40)`); // Adjust position
+
+    // Add legend background box
+    legend.append("rect")
+    .attr("x", 0)
+    .attr("y", 0)
+    .attr("width", 100)  // Adjust width for proper spacing
+    .attr("height", 30)  // Adjust height
+    .attr("fill", "white")  // Background color
+    .attr("stroke", "#333")  // Border color
+    .attr("stroke-width", 1.5)
+    .attr("rx", 5)  // Rounded corners
+    .attr("ry", 5); 
+
+    // Add legend circle
+    legend.append("circle")
+    .attr("cx", 15)
+    .attr("cy", 15)
+    .attr("r", 7)
+    .attr("fill", "rgba(50, 110, 160, 0.5)");
+
+    // Add legend text
+    legend.append("text")
+    .attr("x", 35)
+    .attr("y", 20)
+    .attr("font-size", "14px")
+    .attr("fill", "#333")
+    .text("Calories");
+
 }
 
 // 📌 Show Focused Glucose Graph (with Brushing)
@@ -297,13 +379,36 @@ function showFocusedGlucoseGraph(selectedDay, mealTime, mealName) {
         .attr("height", height);
 
     // Add axes
+    //  x axis
     svgGlucose.append("g")
         .attr("transform", `translate(0,${height - margin.bottom})`)
         .call(d3.axisBottom(xGlucose).tickFormat(d3.timeFormat("%H:%M")));
 
+    // Add X-axis Label
+    svgGlucose.append("text")
+        .attr("class", "axis-label")
+        .attr("x", width / 2)
+        .attr("y", height - margin.bottom + 45) // Position below axis
+        .attr("text-anchor", "middle")
+        .attr("font-size", "16px")
+        .attr("fill", "#333")
+        .text("Time");
+
+    // y axis
     svgGlucose.append("g")
         .attr("transform", `translate(${margin.left},0)`)
         .call(d3.axisLeft(yGlucose));
+
+    // Add Y-axis Label
+    svgGlucose.append("text")
+        .attr("class", "axis-label")
+        .attr("transform", "rotate(-90)") // Rotate for Y-axis
+        .attr("x", -height / 2)
+        .attr("y", margin.left - 45) // Position left of axis
+        .attr("text-anchor", "middle")
+        .attr("font-size", "16px")
+        .attr("fill", "#333")
+        .text("Glucose Level (mg/dL)");
 
     // Draw glucose line
     const glucoseLine = d3.line()
@@ -370,8 +475,6 @@ function showFocusedGlucoseGraph(selectedDay, mealTime, mealName) {
         });
 
 
-
-
     // ✅ Brushing for interactive selection
     const brush = d3.brushX()
         .extent([[margin.left, margin.top], [width - margin.right, height - margin.bottom]])
@@ -382,10 +485,9 @@ function showFocusedGlucoseGraph(selectedDay, mealTime, mealName) {
         .attr("class", "brush")
         .call(brush);
 
-    // 📌 Brushing Event Handler
     function brushMoved({ selection }) {
         if (!selection) {
-            resetBrush();  // Call reset function when selection is cleared
+            resetBrush();  // 🔴 Ensure brush is fully reset
             return;
         }
     
@@ -397,16 +499,20 @@ function showFocusedGlucoseGraph(selectedDay, mealTime, mealName) {
             return time >= x0 && time <= x1;
         });
     
-        // 🔥 **Explicitly reset all points to red FIRST (fix for first brush interaction)**
+        // Reset all points to red FIRST
         glucoseCircles.transition().duration(200).attr("fill", "red");
     
-        // Show brush stats
         if (selectedPoints.length > 0) {
             const avgGlucose = d3.mean(selectedPoints, d => d.level).toFixed(1);
-            showBrushStats(selectedPoints.length, avgGlucose, x1);
+            const timeWindowMinutes = Math.round((x1 - x0) / (1000 * 60)); // Convert ms to minutes
+            const timeEnd = d3.timeFormat("%H:%M")(x1); // End time formatted
+    
+            showBrushStats(timeWindowMinutes, avgGlucose, x1);
+        } else {
+            d3.select(".brush-info").remove();
         }
     
-        // Highlight selected points
+        // Highlight only selected points
         glucoseCircles.transition()
             .duration(200)
             .attr("fill", d => {
@@ -415,47 +521,145 @@ function showFocusedGlucoseGraph(selectedDay, mealTime, mealName) {
             });
     }
     
-
-    // 📌 Reset Brush Function (Ensures Brush Info is Removed)
-    function resetBrush() {
-        brushGroup.call(brush.move, null);  // Clear brush selection
-        d3.select(".brush-info").remove();  // 🔥 Ensure stats disappear
-        glucoseCircles.transition().duration(200).attr("fill", "red");  // Reset colors
-    }
-
-    // 📌 Display Brushing Info (Now dynamically removed)
-    function showBrushStats(count, avgGlucose, xPos) {
-        d3.select(".brush-info").remove(); // 🔥 Remove previous text first
-
+    function showBrushStats(timeWindow, avgGlucose, xEnd) {
+        d3.select(".brush-info").remove(); // Remove previous text first
+    
         svgGlucose.append("text")
             .attr("class", "brush-info")
-            .attr("x", xGlucose(xPos))
+            .attr("x", xGlucose(xEnd)) // Align text with the end of the brush
             .attr("y", margin.top - 10)
             .attr("text-anchor", "middle")
             .attr("fill", "black")
             .attr("font-size", "14px")
             .attr("font-weight", "bold")
-            .text(`Points: ${count} | Avg Glucose: ${avgGlucose} mg/dL`);
+            .text(`Time Window: ${timeWindow} mins | Avg Glucose: ${avgGlucose} mg/dL`);
     }
+    
+    //Reset Brush Function (Ensures Brush Info is Removed)
+    function resetBrush() {
+        brushGroup.call(brush.move, null);  // Clear brush selection
+        d3.select(".brush-info").remove();  // Remove stats
+        glucoseCircles.transition().duration(200).attr("fill", "red");  // Reset colors
+    }
+    
 
-
-    // ✅ **Legend: Meal Name**
+    // // 📌 Display Brushing Info (Now dynamically removed)
     d3.select(".legend-container").remove();  // 🔴 Remove previous legend
 
-    const legend = d3.select("body").append("div")
-        .attr("class", "legend-container");
+    // ✅ Add a properly formatted legend inside the graph
+    const legend = svgGlucose.append("g")
+        .attr("class", "legend")
+        .attr("transform", `translate(${width - 180}, 40)`); // Adjust position
 
-    legend.append("div")
-        .attr("class", "legend-box");
+    // Background box for legend
+    legend.append("rect")
+        .attr("x", 0)
+        .attr("y", 0)
+        .attr("width", 150)  // Adjust width
+        .attr("height", 50)  // Adjust height
+        .attr("fill", "white")  // Background color
+        .attr("stroke", "#333")  // Border color
+        .attr("stroke-width", 1.5)
+        .attr("rx", 5)  // Rounded corners
+        .attr("ry", 5); 
 
-    legend.append("span")
-        .text(`${mealName ? mealName : "A meal"} was ingested`);
+    // Red circle indicator for glucose
+    legend.append("circle")
+        .attr("cx", 15)
+        .attr("cy", 20)
+        .attr("r", 7)
+        .attr("fill", "red");
+
+    // Legend text for glucose
+    legend.append("text")
+        .attr("x", 30)
+        .attr("y", 25)
+        .attr("font-size", "14px")
+        .attr("fill", "#333")
+        .text("Glucose Level");
+
+    // Blue dashed line indicator for meal time
+    legend.append("line")
+        .attr("x1", 10)
+        .attr("x2", 40)
+        .attr("y1", 40)
+        .attr("y2", 40)
+        .attr("stroke", "blue")
+        .attr("stroke-width", 2)
+        .attr("stroke-dasharray", "5,5");
+
+    // Legend text for meal time
+    legend.append("text")
+        .attr("x", 50)
+        .attr("y", 44)
+        .attr("font-size", "14px")
+        .attr("fill", "#333")
+        .text("Meal Time");
 
     createBackButton("Back to Meal", () => {
         d3.selectAll("svg, .back-button, .legend-container, .brush-info").remove();  // 🔴 Remove brush info too
         showMealScatterPlot(selectedDay);
     });
+
+    function showFocusedGlucoseGraph(selectedDay, mealTime, mealName) {
+        d3.select(".tooltip").style("opacity", 0);
+        d3.selectAll("svg, .back-button, .legend-container, .brush-info, .nutrition-table").remove(); // Remove previous elements
+    
+        // Create a container div for graph + table
+        const container = d3.select("body")
+            .append("div")
+            .attr("class", "graph-container")
+            .style("display", "flex")
+            .style("align-items", "center");
+    
+        // Append the SVG for the graph
+        const svgGlucose = container.append("svg")
+            .attr("width", width)
+            .attr("height", height);
+    
+        // Fetch meal details
+        const mealData = foodLogData.find(d => d.day === selectedDay && d.time === mealTime);
+    
+        // ✅ Create the Nutrition Facts Table
+        const table = container.append("div")
+            .attr("class", "nutrition-table")
+            .style("margin-left", "20px") // Spacing from the graph
+            .style("padding", "10px")
+            .style("border", "1px solid #ddd")
+            .style("border-radius", "8px")
+            .style("background", "white")
+            .style("box-shadow", "2px 2px 5px rgba(0, 0, 0, 0.2)");
+    
+        table.append("h3").text("Nutrition Facts").style("text-align", "center");
+    
+        // Populate table with meal data
+        const nutrients = [
+            { label: "Meal", value: mealData ? mealData.food : "Unknown" },
+            { label: "Calories", value: mealData ? `${mealData.calorie} kcal` : "N/A" },
+            { label: "Carb Calories", value: mealData ? `${mealData.carbCalories} kcal` : "N/A" },
+            { label: "Sugar Calories", value: mealData ? `${mealData.sugarCalories} kcal` : "N/A" },
+            { label: "Total Carbs", value: mealData ? `${mealData.carbs} g` : "N/A" },
+        ];
+    
+        nutrients.forEach(nutrient => {
+            const row = table.append("div")
+                .style("display", "flex")
+                .style("justify-content", "space-between")
+                .style("border-bottom", "1px solid #ddd")
+                .style("padding", "5px 0");
+    
+            row.append("span").text(nutrient.label).style("font-weight", "bold");
+            row.append("span").text(nutrient.value);
+        });
+    
+        // ✅ Ensure table remains properly positioned
+        d3.select(".graph-container")
+            .style("display", "flex")
+            .style("justify-content", "space-between");
+    }
+    
 }
+
 
 function findNearestGlucose(mealTime, glucoseData) {
     return glucoseData.reduce((closest, current) => {
@@ -463,5 +667,4 @@ function findNearestGlucose(mealTime, glucoseData) {
                Math.abs(new Date(`2000-01-01 ${closest.time}`) - new Date(`2000-01-01 ${mealTime}`))
             ? current
             : closest;
-    }, glucoseData[0]);
-}
+    }, glucoseData[0])};
