@@ -457,10 +457,6 @@ function showFocusedGlucoseGraph(selectedDay, mealTime, mealName) {
     });
 }
 
-
-
-
-
 function findNearestGlucose(mealTime, glucoseData) {
     return glucoseData.reduce((closest, current) => {
         return Math.abs(new Date(`2000-01-01 ${current.time}`) - new Date(`2000-01-01 ${mealTime}`)) <
