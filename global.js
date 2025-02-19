@@ -475,7 +475,7 @@ function showFocusedGlucoseGraph(selectedDay, mealTime, mealName) {
     // Add Title
     svgGlucose.append("text")
         .attr("x", width / 2) // Centered horizontally
-        .attr("y", margin.top - 20) // Positioned above the graph
+        .attr("y", margin.top - 32) // Positioned above the graph
         .attr("text-anchor", "middle")
         .attr("font-size", "22px")
         .attr("font-weight", "bold")
@@ -651,7 +651,7 @@ function showFocusedGlucoseGraph(selectedDay, mealTime, mealName) {
         svgGlucose.append("text")
             .attr("class", "brush-info")
             .attr("x", xGlucose(xEnd)) // Align text with the end of the brush
-            .attr("y", margin.top - 30)
+            .attr("y", margin.top - 10)
             .attr("text-anchor", "middle")
             .attr("fill", "black")
             .attr("font-size", "14px")
