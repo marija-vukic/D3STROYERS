@@ -299,7 +299,7 @@ function showMealScatterPlot(selectedDay) {
                 <strong>Meal:</strong> ${d.food}<br>
                 <strong>Calories:</strong> ${d.calorie} kcal<br>
                 <strong>Carb Calories:</strong> ${d.carbCalories.toFixed(1)} kcal<br>
-                <strong>Sugar Calories:</strong> ${d.sugarCalories.toFixed(1)} g<br>
+                <strong>Sugar Calories:</strong> ${d.sugarCalories.toFixed(1)} kcal<br>
                 <strong>Time:</strong> ${d.time}
             `)
             .style("left", `${event.pageX + 10}px`)
@@ -607,12 +607,14 @@ function showFocusedGlucoseGraph(selectedDay, mealTime, mealName) {
         showMealScatterPlot(selectedDay);
     });
 
-        // ✅ Ensure table remains properly positioned
-        d3.select(".graph-container")
-            .style("display", "flex")
-            .style("justify-content", "space-between");
-    }
-    
+    // ✅ Ensure table remains properly positioned
+    d3.select(".graph-container")
+        .style("display", "flex")
+        .style("justify-content", "space-between");
+
+        
+}
+
 
 function findNearestGlucose(mealTime, glucoseData) {
     return glucoseData.reduce((closest, current) => {
